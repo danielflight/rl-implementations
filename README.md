@@ -1,9 +1,6 @@
-# RL Implementations 🧠
+# RL Implementations 
 
 A collection of reinforcement learning (RL) algorithms implemented as part of a structured 6-week learning plan.  
-Each week covers core theory, a hands-on implementation, and reflections on how RL ideas connect to algorithmic trading.
-
----
 
 ### Week 1: Core Concepts
 - RL basics: agent, environment, state, action, reward  
@@ -36,7 +33,6 @@ Each week covers core theory, a hands-on implementation, and reflections on how 
 - Deep Q-Networks (DQN): experience replay, target networks  
 - **Code**: Tiny DQN in PyTorch for CartPole  
 
----
 
 ## Clone Repo and Install Dependencies
 
