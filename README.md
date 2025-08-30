@@ -33,6 +33,11 @@ A collection of reinforcement learning (RL) algorithms implemented as part of a 
 - Deep Q-Networks (DQN): experience replay, target networks  
 - **Code**: Tiny DQN in PyTorch for CartPole  
 
+## Resources
+
+- [David Silver's RL course](https://davidstarsilver.wordpress.com/teaching/)
+- [sentdex videos on RL implementations](https://www.youtube.com/playlist?list=PLQVvvaa0QuDezJFIOU5wDdfy4e9vdnx-7)
+
 
 ## Clone Repo and Install Dependencies
 
