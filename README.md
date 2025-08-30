@@ -38,7 +38,7 @@ A collection of reinforcement learning (RL) algorithms implemented as part of a 
 
 ```bash
 # clone repo
-git clone https://github.com/<your-username>/rl-implementations.git
+git clone https://github.com/danielflight/rl-implementations.git
 cd rl-implementations
 
 # install dependencies
