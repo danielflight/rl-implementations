@@ -15,6 +15,8 @@ else:
 
 os.makedirs(f"{rundir}/plots", exist_ok=True)
 
+
+
 # -----------------------------
 # General settings
 # -----------------------------
@@ -49,11 +51,6 @@ logger.info(f"""
 
 """)
 
-# def create_dirs():
-#     os.makedirs("qtables/qlearning", exist_ok=True)
-#     os.makedirs("qtables/sarsa", exist_ok=True)
-#     os.makedirs("plots", exist_ok=True)
-
 def get_discrete_state(state, env, discrete_os_win_size):
     """Convert continuous state to discrete if needed."""
     if isinstance(env.observation_space, gym.spaces.Discrete):
@@ -65,6 +62,8 @@ def get_discrete_state(state, env, discrete_os_win_size):
 
 
 def train_agent(env_name, algorithm="qlearning", render=False):
+    """ Trains an RL agent using either the qlearning or sarsa algorithm, on a gym environment."""
+
     env = gym.make(env_name)
     os.makedirs(f"{rundir}/qtables/{algorithm}", exist_ok=True)
     logger.info(f"Training an agent using the {algorithm} algorithm...\n")
@@ -186,11 +185,8 @@ def train_agent(env_name, algorithm="qlearning", render=False):
 
 
 if __name__ == '__main__':
-
-
     ## render pygame window 
     render = False
-    # create_dirs()
 
     qlearning_results = train_agent(env_name, "qlearning", render=render)
     sarsa_results = train_agent(env_name, "sarsa", render=render)
@@ -203,7 +199,6 @@ if __name__ == '__main__':
     plt.title(f"Q-learning vs SARSA on {env_name}")
     plt.legend()
     plt.savefig(f"{rundir}/plots/qlearning_vs_sarsa_{env_name}.png")
-    # plt.show()
 
     # plot_qtables(rundir=rundir, num_episodes=EPISODES, algorithm="qlearning", create_vid=True)
     
