@@ -6,32 +6,26 @@ A collection of reinforcement learning (RL) algorithms implemented as part of a 
 - RL basics: agent, environment, state, action, reward  
 - Markov Decision Processes (MDPs)  
 - Value functions and Bellman equations  
-- **Code**: toy example mapping state/action/reward to a trading setup  
 
 ### Week 2: Tabular Value-Based Methods
 - Policy evaluation & improvement  
 - Monte Carlo vs Temporal Difference learning  
-- **Code**: MC prediction & TD(0) on FrozenLake  
 
 ### Week 3: Q-Learning & SARSA
 - Q-learning (off-policy) vs SARSA (on-policy)  
 - Exploration–exploitation trade-off  
-- **Code**: Q-learning & SARSA on FrozenLake and CartPole  
 
 ### Week 4: Policy Gradients
 - Policy gradient theorem  
 - REINFORCE algorithm  
-- **Code**: REINFORCE for CartPole  
 
 ### Week 5: Actor–Critic
 - Combining value and policy learning  
 - Advantage functions  
-- **Code**: Simple Actor–Critic implementation  
 
 ### Week 6: Deep Reinforcement Learning
 - Function approximation & large state spaces  
 - Deep Q-Networks (DQN): experience replay, target networks  
-- **Code**: Tiny DQN in PyTorch for CartPole  
 
 ## Resources
 
