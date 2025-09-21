@@ -17,9 +17,8 @@ os.makedirs(f"{rundir}/plots", exist_ok=True)
 
 
 
-# -----------------------------
-# General settings
-# -----------------------------
+########################################## Hyperparameters ##########################################
+
 
 env_name = "MountainCar-v0"  # change to "CartPole-v1" or "FrozenLake-v1"
 LEARNING_RATE = 0.1
@@ -59,6 +58,8 @@ def get_discrete_state(state, env, discrete_os_win_size):
         discrete_state = (state - env.observation_space.low) / discrete_os_win_size
         return tuple(discrete_state.astype(int))
 
+
+########################################## Train agent ##########################################
 
 
 def train_agent(env_name, algorithm="qlearning", render=False):
