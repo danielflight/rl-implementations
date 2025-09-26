@@ -1,0 +1,15 @@
+2025-09-26 21:31:05,877 - INFO 
+   
+
+    === Environment settings and hyperparameters ===
+        
+        Environment: CartPole
+        Step-size: 0.99
+        Learning rate: 0.001
+
+    === Training settings ===
+
+        Number of episodes: 10000
+        Showing every 1000 episodes
+        Normalising returns?: True
+    

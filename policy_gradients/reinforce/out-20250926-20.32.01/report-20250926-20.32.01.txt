@@ -1,0 +1,14 @@
+2025-09-26 20:32:01,498 - INFO 
+   
+
+    === Environment settings and hyperparameters ===
+        
+        Environment: CartPole
+        Step-size: 0.99
+
+    === Training settings ===
+
+        Number of episodes: 10000
+        Showing every 1000 episodes
+        Normalising returns?: True
+    

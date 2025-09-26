@@ -3,3 +3,4 @@ gym[classic_control]
 matplotlib
 numpy==1.23.0
 opencv-python
+torch
