@@ -129,6 +129,7 @@ if __name__ == "__main__":
         # 1 if you reach the goal
         # 0 if you fall into a hole
     # Termination: falling into a hole or reaching the goal
+    
     env = gym.make("FrozenLake-v1", is_slippery=True)  # change is_slippery=False for deterministic
     nS = env.observation_space.n
     nA = env.action_space.n
@@ -136,16 +137,9 @@ if __name__ == "__main__":
     # policy: uniformly random
     policy = np.ones((nS, nA)) / nA
 
-    # alternative policy:
-    ## action mapping: 0=Left, 1=Down, 2=Right, 3=Up
-    # policy = np.zeros((nS, nA))
-    # for s in range(nS):
-    #     if s % 4 < 3:  # if not in rightmost column
-    #         policy[s, 2] = 1.0  # prefer Right
-    #     else:
-    #         policy[s, 1] = 1.0  # otherwise go Down
-
     V_est, start_state_returns = mc_first_visit_prediction(env, policy, num_episodes=10000, gamma=0.99)
+
+
     # print("Estimated V (as 1D array):")
     # print(np.round(V_est, 3))
     print("\nEstimated V (4x4 grid):")
