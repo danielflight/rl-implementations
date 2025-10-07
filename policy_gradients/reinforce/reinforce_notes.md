@@ -60,3 +60,8 @@ $\newline \newline$
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; for step-size $\alpha$.
 
 ---
+
+## References
+
+- Sutton, Barto, *Reinforcement Learning: An Introduction*, 2nd Edition.
+- David Silver's lectures on Reinforcement Learning.

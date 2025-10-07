@@ -48,9 +48,7 @@ class PolicyNetwork(nn.Module):
         return self.fc(x)
 
 policy_nn = PolicyNetwork(state_dim, action_dim)
-optimiser_nn = optim.Adam(policy_nn.parameters(), lr=alpha) # gradient-based optimizer (Adam). 
-                                                           # It updates the weights of the network (theta) 
-                                                           # using gradients from the REINFORCE loss
+optimiser_nn = optim.Adam(policy_nn.parameters(), lr=alpha) # It updates the weights of the network (theta) using gradients from the REINFORCE loss
 
 
 ############################################################################
@@ -71,7 +69,7 @@ optimiser_linear = optim.Adam(policy_linear.parameters(), lr=alpha)
 ############################################################################
 
 
-def generate_episode(env, policy_nn, render = False):
+def generate_episode(env, policy, render = False):
     """
     Generates the episode, and allows the policy to interact with the env
 
@@ -90,7 +88,7 @@ def generate_episode(env, policy_nn, render = False):
 
         # sample action
         state_tensor = torch.tensor(state, dtype=torch.float32)
-        action_probs = policy_nn(state_tensor)
+        action_probs = policy(state_tensor)
         action_dist = torch.distributions.Categorical(action_probs)
         action = action_dist.sample().item()
 
@@ -132,7 +130,7 @@ def compute_returns(episode, gamma = 1.0, normalise = True):
     return returns
 
 
-def update_policy(episode, returns, policy_nn, optimizer_nn):
+def update_policy(episode, returns, policy, optimizer_nn):
     """
     Updates the current policy parameters using the policy gradient theorem:
     
@@ -142,7 +140,7 @@ def update_policy(episode, returns, policy_nn, optimizer_nn):
     for (state, action, _), G_t in zip(episode, returns):
         # compute log probability 
         state_tensor = torch.tensor(state, dtype=torch.float32)
-        action_probs = policy_nn(state_tensor)
+        action_probs = policy(state_tensor)
         dist = torch.distributions.Categorical(action_probs)
         log_prob = dist.log_prob(torch.tensor(action))
 
@@ -161,7 +159,7 @@ def update_policy(episode, returns, policy_nn, optimizer_nn):
     return loss.item()
 
 
-def evaluate_policy(env, policy_nn, num_episodes=5, render=False, sleep_time=0.05):
+def evaluate_policy(env, policy, num_episodes=5, render=False, sleep_time=0.05):
     """
     Evaluates the policy without sampling actions to see how good the policy is by returning an avg return over a 
     chosen number of episodes
@@ -176,7 +174,7 @@ def evaluate_policy(env, policy_nn, num_episodes=5, render=False, sleep_time=0.0
                 env.render()
                 time.sleep(sleep_time)
             state_tensor = torch.tensor(state, dtype=torch.float32)
-            action_probs = policy_nn(state_tensor)
+            action_probs = policy(state_tensor)
             action = torch.argmax(action_probs).item()  # greedy action
             state, reward, terminated, truncated, _ = env.step(action)
             done = terminated or truncated
@@ -213,44 +211,46 @@ if __name__ == '__main__':
         Normalising returns?: {normalise_returns}
     """)
 
+    train = True 
 
-    ## Training loop
-    for episode_num in range(EPISODES):
-        # # generate an episode
-        episode = generate_episode(env, policy_nn)
+    if train:
+        ## Training loop
+        for episode_num in range(EPISODES):
+            # # generate an episode
+            episode = generate_episode(env, policy_nn)
 
-        # compute returns
-        returns = compute_returns(episode, gamma, normalise=normalise_returns)
-        
-        # update policy
-        loss = update_policy(episode, returns, policy_nn, optimiser_nn)
-        
-        # track total reward for episode
-        total_reward = sum([r for (_, _, r) in episode])
-        reward_history.append(total_reward)
-        
-        # print progress 
-        if (episode_num+1) % SHOW_EVERY == 0:
-            avg_reward = sum(reward_history[-SHOW_EVERY:])/SHOW_EVERY
-            print(f"Episode {episode_num+1}, Avg Reward: {avg_reward:.2f}")
+            # compute returns
+            returns = compute_returns(episode, gamma, normalise=normalise_returns)
+            
+            # update policy
+            loss = update_policy(episode, returns, policy_nn, optimiser_nn)
+            
+            # track total reward for episode
+            total_reward = sum([r for (_, _, r) in episode])
+            reward_history.append(total_reward)
+            
+            # print progress 
+            if (episode_num+1) % SHOW_EVERY == 0:
+                avg_reward = sum(reward_history[-SHOW_EVERY:])/SHOW_EVERY
+                print(f"Episode {episode_num+1}, Avg Reward: {avg_reward:.2f}")
 
-# save policy parameters
-torch.save(policy_nn.state_dict(), f"{rundir}/policy_params.pth")
+        # save policy parameters
+        torch.save(policy_nn.state_dict(), f"{rundir}/policy_params.pth")
 
-## plot learning curve
-window = SHOW_EVERY
-moving_avg = np.convolve(reward_history, np.ones(SHOW_EVERY)/SHOW_EVERY, mode='valid')
-plt.plot(moving_avg)
-plt.xlabel("Episode")
-plt.ylabel(f"Moving Average Reward ({SHOW_EVERY} episodes)")
-plt.title("REINFORCE: Learning Curve")
-plt.savefig(f"{rundir}/plots/REINFORCE-learning-curve.png")
+        ## plot learning curve
+        window = SHOW_EVERY
+        moving_avg = np.convolve(reward_history, np.ones(SHOW_EVERY)/SHOW_EVERY, mode='valid')
+        plt.plot(moving_avg)
+        plt.xlabel("Episode")
+        plt.ylabel(f"Moving Average Reward ({SHOW_EVERY} episodes)")
+        plt.title("REINFORCE: Learning Curve")
+        plt.savefig(f"{rundir}/plots/REINFORCE-learning-curve.png")
+    
+    else:
+        # load a saved policy 
+        policy_nn = PolicyNetwork(state_dim, action_dim)
+        policy_nn.load_state_dict(torch.load("policy_params.pth"))
+        policy_nn.eval()
 
-# render final graphic
-evaluate_policy(render_env, policy_nn, num_episodes=10, render=True, sleep_time=0.05)
-
-### NOTE: To load in a saved policy, just do
-# policy_nn = PolicyNetwork(state_dim, action_dim)
-# policy_nn.load_state_dict(torch.load("policy_cartpole.pth"))
-# policy_nn.eval()
-###
+    # render final graphic
+    evaluate_policy(render_env, policy_nn, num_episodes=10, render=True, sleep_time=0.05)

@@ -1,0 +1,17 @@
+2025-10-06 21:52:03,354 - INFO 
+   
+
+    === Environment settings and hyperparameters ===
+        
+        Environment: LunarLander-v3
+        Discount factor: 0.99
+        Learning rate (Actor): 0.0003
+        Learning rate (Critic): 0.001
+        Initial entropy coefficient: 0.05
+
+    === Training settings ===
+
+        Number of episodes: 5000
+        Maximum number of steps per episode: 500
+        Showing every 500 episodes
+    
