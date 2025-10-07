@@ -4,3 +4,5 @@ matplotlib
 numpy==1.23.0
 opencv-python
 torch
+swig
+gymnasium[box2d]
