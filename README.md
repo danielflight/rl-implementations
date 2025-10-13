@@ -6,15 +6,15 @@ A collection of reinforcement learning (RL) algorithms implemented as part of a 
 - **Policy prediction**:
   -  Monte Carlo (MC)
   -  Temporal Difference (TD)
-- Simple control via tabular methods:
+- **Simple control** via tabular methods:
   -  Q-Learning (off-policy)
   -  SARSA (on-policy) 
-- Policy gradient methods:
+- **Policy gradient methods**:
   - policy gradient theorem
   - REINFORCE
   - Q Actor-Critic
   - TD Actor-Critic
-- Deep reinforcement learning basics:
+- **Deep reinforcement learning** basics:
   - Deep Q-Networks (DQN)
 
 ## Resources
