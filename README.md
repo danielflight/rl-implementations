@@ -1,4 +1,4 @@
-# RL Implementations 
+# Reinforcement Learning Implementations 
 
 A collection of reinforcement learning (RL) algorithms implemented as part of a structured learning plan.  
 
