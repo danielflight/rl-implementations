@@ -99,7 +99,7 @@ if __name__ == "__main__":
         Showing every {SHOW_EVERY} episodes
     """)
 
-    train = True
+    train = False
 
     if train:
         ## Training loop

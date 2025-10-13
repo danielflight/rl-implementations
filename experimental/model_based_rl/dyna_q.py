@@ -14,7 +14,7 @@ I plan to improve this in future, by finding a better environment, and/or using 
 import sys
 import os
 import time
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 from utils import *
 
 import gymnasium as gym
