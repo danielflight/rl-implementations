@@ -27,35 +27,36 @@ import numpy as np
 from collections import deque
 import random
 
-env = gym.make("CartPole-v1")
-env_render = gym.make("CartPole-v1", render_mode="human")
-state_dim = env.observation_space.shape[0]
-action_dim = env.action_space.n
+env = gym.make("MountainCar-v0")
+env_render = gym.make("MountainCar-v0", render_mode="human")
+state_dim = env.observation_space.shape[0]  # 2: position, velocity
+action_dim = env.action_space.n  # 3: left, neutral, right
 
 
 # Hyperparams
 # ================================================================================
 
-DATA_COLLECTION_EPISODES = 500
-TRAINING_EPISODES = 100
+DATA_COLLECTION_EPISODES = 100
+TRAINING_EPISODES = 200
 SHOW_EVERY = 10
-PLANNING_STEPS = 1000
+PLANNING_STEPS = 100  # More planning helps on Mountain Car
 
-learning_rate_q = 1e-3
-learning_rate_model = 5e-3
+learning_rate_q = 5e-3
+learning_rate_model = 5e-2
 gamma = 0.99
+model_train_interval = 5  # Retrain model every N episodes
 
 
 # For data collection
 # ================================================================================
 
-real_buffer = deque(maxlen=10_000)
+real_buffer = deque(maxlen=50_000)
 
 def collect_data(env, episodes=20):
     """
     Collects random experience from the environment and stores in a buffer.
     """
-
+    print(f"Collecting {episodes} episodes of random data...")
     for ep in range(episodes):
         state, _ = env.reset()
         done = False
@@ -65,6 +66,8 @@ def collect_data(env, episodes=20):
             done = terminated or truncated
             real_buffer.append((state, action, reward, next_state, done))
             state = next_state
+        if (ep + 1) % 20 == 0:
+            print(f"  Collected {ep+1}/{episodes} episodes")
 
 collect_data(env, DATA_COLLECTION_EPISODES)
 print(f"Collected {len(real_buffer)} samples.\n")
@@ -85,7 +88,7 @@ class DynamicsModel(nn.Module):
             nn.ReLU(),
             nn.Linear(128, 128),
             nn.ReLU(),
-            nn.Linear(128, state_dim + 1)  # predict next_state (4 dims) + reward (1 dim)
+            nn.Linear(128, state_dim + 1)  # predict next_state + reward
         )
 
     def forward(self, state, action):
@@ -96,9 +99,74 @@ class DynamicsModel(nn.Module):
         return self.net(x)
     
 model = DynamicsModel(state_dim, action_dim)
-optimiser = optim.Adam(model.parameters(), lr=learning_rate_model)
+optimiser_model = optim.Adam(model.parameters(), lr=learning_rate_model)
 loss_fn = nn.MSELoss()
 
+
+def train_model(model, real_buffer, epochs=50, batch_size=64, val_split=0.2):
+    """
+    Trains the dynamics model on the real buffer with validation and early stopping.
+    """
+    # Split data into train/validate
+    all_data = list(real_buffer)
+    val_size = max(1, int(len(all_data) * val_split))
+    val_data = all_data[:val_size]
+    train_data = all_data[val_size:]
+    
+    if len(train_data) < batch_size:
+        return 0.0
+    
+    best_val_loss = float('inf')
+    patience = 15
+    patience_counter = 0
+    
+    training_data = []
+    for epoch in range(epochs):
+        # Training step
+        batch = random.sample(train_data, batch_size)
+        state, action, reward, next_state, done = zip(*batch)
+        state = torch.tensor(np.array(state), dtype=torch.float32)
+        action = torch.tensor(action, dtype=torch.int64)
+        reward = torch.tensor(reward, dtype=torch.float32).unsqueeze(1)
+        next_state = torch.tensor(np.array(next_state), dtype=torch.float32)
+
+        pred = model(state, action)
+        pred_next_state = pred[:, :-1]
+        pred_reward = pred[:, -1:]
+
+        loss = loss_fn(pred_next_state, next_state) + loss_fn(pred_reward, reward) # training loss
+        optimiser_model.zero_grad()
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+        optimiser_model.step()
+        
+        # Validation step
+        if epoch % 1 == 0 and len(val_data) >= batch_size:
+            val_batch = random.sample(val_data, min(batch_size, len(val_data)))
+            val_state, val_action, val_reward, val_next_state, val_done = zip(*val_batch)
+            val_state = torch.tensor(np.array(val_state), dtype=torch.float32)
+            val_action = torch.tensor(val_action, dtype=torch.int64)
+            val_reward = torch.tensor(val_reward, dtype=torch.float32).unsqueeze(1)
+            val_next_state = torch.tensor(np.array(val_next_state), dtype=torch.float32)
+            
+            with torch.no_grad():
+                val_pred = model(val_state, val_action)
+                val_pred_next_state = val_pred[:, :-1]
+                val_pred_reward = val_pred[:, -1:]
+                val_loss = loss_fn(val_pred_next_state, val_next_state) + loss_fn(val_pred_reward, val_reward) # validation loss
+            
+            # Early stopping
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                patience_counter = 0
+            else:
+                patience_counter += 1
+                if patience_counter >= patience:
+                    break
+        print(f"Epoch {epoch+1}, Train Loss: {loss.item():.6f}, Val Loss: {val_loss.item():.6f}")
+        training_data.append((epoch+1, loss.item(), val_loss.item()))
+
+    return best_val_loss.item(), training_data
 
 
 # Planning with the learned model
@@ -107,13 +175,7 @@ loss_fn = nn.MSELoss()
 def model_based_planning(model, q_network, optimizer_q, real_buffer, planning_steps=50):
     """
     Performs planning updates using the learned dynamics model.
-    
-    Args:
-        model: DynamicsModel instance predicting next_state and reward
-        q_network: Q-network (state-action value estimator)
-        optimizer_q: optimizer for Q-network
-        real_buffer: buffer of real transitions to sample starting states from
-        planning_steps (int): number of synthetic updates to perform
+    Uses standard Q-learning (max over next actions for off-policy updates).
     """
     for _ in range(planning_steps):
         # Sample a real transition to start from
@@ -128,14 +190,12 @@ def model_based_planning(model, q_network, optimizer_q, real_buffer, planning_st
             next_state_pred = pred[:, :-1]
             reward_pred = pred[:, -1:]
         
-        # Simple Q-learning update (TD target using max over next actions)
-        next_q_values = q_network(next_state_pred)
-        # td_target = (reward_pred + 0.99 * torch.max(next_q_values)).squeeze()  # gamma=0.99
-        next_action_probs = torch.softmax(next_q_values, dim=-1)
-        next_v = torch.sum(next_action_probs * next_q_values, dim=-1)
-        td_target = (reward_pred + 0.99 * next_v).squeeze()  # gamma=0.99
+        # Q-learning update (off-policy: max over next actions)
+        with torch.no_grad():
+            next_q_values = q_network(next_state_pred)
+            max_next_q = torch.max(next_q_values, dim=-1, keepdim=True)[0]
+            td_target = (reward_pred + gamma * max_next_q).squeeze()
 
-        
         # Current Q-value for (s,a)
         q_values = q_network(state_tensor)
         q_selected = q_values[0, action]
@@ -166,35 +226,19 @@ class QNetwork(nn.Module):
 q_network = QNetwork(state_dim, action_dim)
 optimiser_q = optim.Adam(q_network.parameters(), lr=learning_rate_q)
 
-# # Perform planning updates
-# model_based_planning(model, q_network, optimiser_q, real_buffer, planning_steps=50)
-# print("Planning step complete!\n")
-
 
 
 
 # DynaQ training loop
 # ================================================================================
 
-def dyna_q_training(env, model, q_network, episodes=100, max_steps=300,
-                    real_buffer=None, planning_steps=50, gamma=0.99):
+def dyna_q_training(env, model, q_network, episodes=100, max_steps=500,
+                    real_buffer=None, planning_steps=50, gamma=0.99,
+                    model_train_interval=10):
     """
     Trains a Q-network using both real and model-generated experience (Dyna-Q).
-    
-    Args:
-        env: Gym environment
-        model: Learned DynamicsModel
-        q_network: Q-network
-        episodes (int): Number of episodes to run
-        max_steps (int): Max steps per episode
-        real_buffer: deque storing real transitions
-        planning_steps (int): Number of model-generated updates per real step
-        gamma (float): Discount factor
     """
-    optimiser_q = optim.Adam(q_network.parameters(), lr=1e-3)
-    
-    if real_buffer is None:
-        real_buffer = deque(maxlen=5000)
+    real_buffer = deque(maxlen=50_000)
 
     reward_history = []
 
@@ -204,7 +248,7 @@ def dyna_q_training(env, model, q_network, episodes=100, max_steps=300,
         done = False
 
         for t in range(max_steps):
-            epsilon = max(0.05, 0.75 - 0.01*(ep/episodes))  # decay epsilon
+            epsilon = max(0.05, 0.5 - 0.01*(ep/episodes))  # decay epsilon
 
             # choose action using epsilon-greedy
             if np.random.rand() < epsilon:
@@ -229,10 +273,8 @@ def dyna_q_training(env, model, q_network, episodes=100, max_steps=300,
 
             with torch.no_grad():
                 next_q_values = q_network(next_state_tensor)
-                next_action_probs = torch.softmax(next_q_values, dim=-1)
-                next_v = torch.sum(next_action_probs * next_q_values, dim=-1)
-                td_target = (reward + gamma * next_v * (1 - int(done))).squeeze()
-                # td_target = (reward + gamma * torch.max(next_q_values) * (1 - int(done))).squeeze()
+                max_next_q = torch.max(next_q_values, dim=-1)[0]
+                td_target = (reward + gamma * max_next_q * (1 - int(done))).squeeze()
 
             q_values = q_network(state_tensor)
             q_selected = q_values[0, action]
@@ -242,7 +284,7 @@ def dyna_q_training(env, model, q_network, episodes=100, max_steps=300,
             loss.backward()
             optimiser_q.step()
 
-            # now loop over simulated experience
+            # Perform simulated experience planning
             model_based_planning(model, q_network, optimiser_q, real_buffer, planning_steps)
 
             state = next_state
@@ -250,35 +292,38 @@ def dyna_q_training(env, model, q_network, episodes=100, max_steps=300,
                 break
 
         reward_history.append(episode_reward)
+        
+        # Periodically retrain the model on accumulated real data
+        if (ep + 1) % model_train_interval == 0 and len(real_buffer) > 256:
+            model_loss, _ = train_model(model, real_buffer, epochs=100, batch_size=64)
+            print(f"Episode {ep+1}: Retrained model, val_loss = {model_loss:.6f}")
+        
         if (ep+1) % SHOW_EVERY == 0:
             avg_reward = np.mean(reward_history[-SHOW_EVERY:])
-            print(f"Episode {ep+1}, Avg Reward (last 10 eps): {avg_reward:.2f}")
+            print(f"Episode {ep+1}, Avg Reward (last {SHOW_EVERY} eps): {avg_reward:.2f}")
 
     return q_network, reward_history
 
 
 def evaluate_policy(env, q_network, num_episodes=10, render=True, sleep_time=0.05):
     """
-    Evaluates the policy without sampling actions to see how good the policy is by returning an avg return over a 
-    chosen number of episodes
+    Evaluates the policy without sampling actions
     """
     total_rewards = []
     for ep_num in range(num_episodes):
-
-        # Test learned policy
         state, _ = env.reset()
         done = False
         total_reward = 0
         while not done:
 
-            if render:  # render every step
+            if render:
                 env.render()
                 time.sleep(sleep_time)
 
             state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0)
             with torch.no_grad():
                 q_values = q_network(state_tensor)
-                action = torch.argmax(q_values, dim=-1).item() # greedy action
+                action = torch.argmax(q_values, dim=-1).item()
             next_state, reward, terminated, truncated, _ = env.step(action)
             done = terminated or truncated
             total_reward += reward
@@ -302,8 +347,8 @@ if __name__ == "__main__":
 
     === Environment settings and hyperparameters ===
         
-        Environment: CartPole
-        Step-size: {gamma}
+        Environment: MountainCar-v0
+        Discount factor: {gamma}
         Model learning rate: {learning_rate_model}
         Q-network learning rate: {learning_rate_q}
 
@@ -313,40 +358,32 @@ if __name__ == "__main__":
         Showing every {SHOW_EVERY} episodes
         Number of planning steps per real step: {PLANNING_STEPS}
         Number of data collection episodes: {DATA_COLLECTION_EPISODES}
+        Model retraining interval: every {model_train_interval} episodes
     """)
 
 
-    train_model = True
+    train_model_flag = True
     train_agent = True
 
 
-    if train_model:
+    if train_model_flag:
 
-        BATCH_SIZE = 256 
-        EPOCHS = 1000 
-
-        for epoch in range(EPOCHS):
-            batch = random.sample(real_buffer, BATCH_SIZE)
-            state, action, reward, next_state, done = zip(*batch)
-            state = torch.tensor(np.array(state), dtype=torch.float32)
-            action = torch.tensor(action, dtype=torch.int64)
-            reward = torch.tensor(reward, dtype=torch.float32).unsqueeze(1)
-            next_state = torch.tensor(np.array(next_state), dtype=torch.float32)
-
-            pred = model(state, action)
-            pred_next_state = pred[:, :-1]
-            pred_reward = pred[:, -1:]
-
-            # update model
-            loss = loss_fn(pred_next_state, next_state) + loss_fn(pred_reward, reward)
-            optimiser.zero_grad()
-            loss.backward()
-            optimiser.step()
-
-            if epoch % 100 == 0:
-                print(f"Epoch {epoch}: model loss = {loss.item():.4f}")
-        print()
+        print("Training initial model...")
+        model_loss, training_data = train_model(model, real_buffer, epochs=200, batch_size=64)
+        print(f"Initial model training complete. Final val_loss: {model_loss:.6f}\n")
         torch.save(model.state_dict(), f"{rundir}/dynamics_model.pth")
+
+
+        plt.figure()
+        epochs_arr, train_losses, val_losses = zip(*training_data)
+        plt.plot(epochs_arr, train_losses, label='Train Loss')
+        plt.plot(epochs_arr, val_losses, label='Val Loss')
+        plt.xlabel("Epoch")
+        plt.ylabel("Loss")
+        plt.yscale('log')
+        plt.title("Dynamics Model Training")
+        plt.legend()
+        plt.savefig(f"{rundir}/plots/initial_dynamics_model_training.png")
     
     else:
         model = DynamicsModel(state_dim, action_dim)
@@ -357,7 +394,9 @@ if __name__ == "__main__":
     
         # Train Dyna-Q
         q_network = QNetwork(state_dim, action_dim)
-        q_network, rewards = dyna_q_training(env, model, q_network, episodes=TRAINING_EPISODES, planning_steps=PLANNING_STEPS, gamma=gamma)
+        q_network, rewards = dyna_q_training(env, model, q_network, episodes=TRAINING_EPISODES, 
+                                              planning_steps=PLANNING_STEPS, gamma=gamma,
+                                              model_train_interval=model_train_interval)
 
         torch.save(q_network.state_dict(), f"{rundir}/q_network.pth")
 
@@ -368,15 +407,17 @@ if __name__ == "__main__":
         plt.plot(moving_avg)
         plt.xlabel("Episode")
         plt.ylabel(f"Moving Average Reward ({SHOW_EVERY} episodes)")
-        plt.title("Dyna Q: Learning Curve")
-        plt.savefig(f"{rundir}/plots/DynaQ-learning-curve.png")
+        plt.title("Dyna-Q on Mountain Car: Learning Curve")
+        plt.savefig(f"{rundir}/plots/DynaQ-MountainCar-learning-curve.png")
+        plt.show()
 
     else:
         q_network = QNetwork(state_dim, action_dim)
         q_network.load_state_dict(torch.load("q_network.pth"))
         q_network.eval()
 
-    # run without updates / sampling
-    evaluate_policy(env_render, q_network, num_episodes=10, render=True, sleep_time=0.05)
+    # Evaluate
+    print("\nEvaluating policy...")
+    evaluate_policy(env_render, q_network, num_episodes=5, render=True, sleep_time=0.02)
 
 
