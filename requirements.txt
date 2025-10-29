@@ -6,3 +6,5 @@ opencv-python
 torch
 swig
 gymnasium[box2d]
+keras
+tensorflow-gpu
