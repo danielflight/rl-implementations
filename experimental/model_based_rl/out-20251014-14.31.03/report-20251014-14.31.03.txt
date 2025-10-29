@@ -1,0 +1,18 @@
+2025-10-14 14:31:03,932 - INFO 
+   
+
+    === Environment settings and hyperparameters ===
+        
+        Environment: MountainCar-v0
+        Discount factor: 0.99
+        Model learning rate: 0.05
+        Q-network learning rate: 0.005
+
+    === Training settings ===
+
+        Number of training episodes: 200
+        Showing every 10 episodes
+        Number of planning steps per real step: 100
+        Number of data collection episodes: 100
+        Model retraining interval: every 5 episodes
+    
